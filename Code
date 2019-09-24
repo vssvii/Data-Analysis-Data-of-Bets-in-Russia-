@@ -1,0 +1,95 @@
+import pandas as pd  #использование библиотеки pandas
+log = pd.read_csv("C:/Users/Ibragim/SF/Python Data Analysis/DataSet/log.csv", header=None) #импортирование файла log.csv
+log.columns=['user_id', 'time', 'bet', 'win'] #новые названия столбцов
+log['time']=log['time'].str.replace('[', '')  #удаление "[" (как ошибка)
+log['bet']=log['bet'].fillna(0)
+log['win']=log['win'].fillna(0)  # замена пустых ячеек на 0
+
+def fillna_win(row):  #создание функции, которая заполнит 0 пустые ячейки в выигрыше, и оставит цифры, которые были выиграны
+    if row.bet==0: #если ставка bet=0, то выигрыш win=0
+        return 0
+    elif row.bet>0 and row.win>0: #если ставка bet>0 и выигрыш win>0, то выигрыш win=win
+        return row.win
+    else:
+        return -row.bet #если ставка bet>0 и выигрыш win=0, то выигрыш win=-bet
+def de_win(r): #создание функции, которая заполнит net, где будет показано, сколько денег, выиграл клиент чистыми или потерял
+    if r.win >= 0:#если выигрыш win>=0, то net=win-bet
+        return r.win-r.bet
+    else: #если выигрыш win<0, то net=win
+        return r.win
+win_net = log.apply(lambda r: de_win(r), axis=1) #создание функции win_net, где есть функция de_win
+log['net']=win_net # создание нового столбца net и внедрение функции win_net
+
+users = pd.read_csv("users.csv",sep='\t', encoding = 'koi8_r') # импортирование файла users.csv
+users.columns=['user_id','email','geo'] #новые названия столбцов
+
+users.user_id=users.user_id.apply(lambda x: x.lower()) # Приведем признак user_id к одному формату в обоих датасетах  
+
+log = log[log.user_id != '#error']  
+log.user_id = log.user_id.str.split(' - ').apply(lambda x: x[1]) ## Избавимся от ошибок в user_id 
+
+mixed=pd.merge(log, users, on='user_id') #Объединение 2-ух датасетов в одну (log, users)
+
+#Теперь можно сгруппировать данные и применить методы агрегации
+
+mixed.groupby('user_id').sum().median()['net'] # Посчитать медиану баланса (net) по каждому пользователю
+
+# Ответ: 1986
+
+mixed[mixed.bet==0].groupby('user_id').bet.count().sum()/len(mixed.user_id.unique()) # Сколько раз в среднем каждый человек приходит, не делая ставок, при условии, что у этого человека все-таки есть хотя бы одна ставка
+
+# Ответ: 5
+
+mixed.time = pd.to_datetime(mixed.time, format='%Y-%m-%d %H:%M:%S') # Для того, чтобы Python смог распознать дату и время
+
+(mixed[mixed.bet>0].groupby('user_id').time.min()-mixed[mixed.bet==0].groupby('user_id').time.min()).sum()/len(mixed.user_id.unique())
+# Сколько в среднем времени проходит между появлением человека в сервисе и первой ставкой (Расчет идет, только тех, кто делал ставку (код сверху)
+
+# Ответ: Timedelta('46 days 06:54:48')
+
+mixed.groupby('geo').sum()['win'] #суммарный выигрыш по городам
+
+Ответ: geo
+Арзангелтск           74375.0
+Воронеж              184338.0
+Екатеринбург          36682.0
+Ижевск                84895.0
+Казань                97806.0
+Краснодар             62718.0
+Красноярск            84767.0
+Москва             11959741.0
+Пермь                 67734.0
+Санкт-Петербург      151007.0
+Ставрополь            46003.0
+Тюмень                 4701.0
+Хабаровск             65459.0
+Ярославль             97441.0
+Name: win, dtype: float64
+
+max_bet = mixed.groupby('geo').bet.mean().max()
+min_bet = mixed.groupby('geo').bet.mean().min()
+max_bet / min_bet # Во сколько раз отличается в среднем максимальная ставка и минимальная ставка по городам
+
+Ответ: 227
+
+mixed.groupby('geo').user_id.count() #сколько раз пользователи приходили в букмекерскую контору в каждом городе
+
+Ответ: geo
+Арзангелтск         96
+Воронеж             88
+Екатеринбург        49
+Ижевск              61
+Казань              66
+Краснодар           86
+Красноярск          56
+Москва              61
+Пермь               55
+Санкт-Петербург    115
+Ставрополь          36
+Тюмень              32
+Хабаровск           60
+Ярославль           89
+Name: user_id, dtype: int64
+
+
+
